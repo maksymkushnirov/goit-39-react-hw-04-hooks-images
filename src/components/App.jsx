@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import * as api from 'services/api';
 import ImageGallery from 'components/ImageGallery';
@@ -7,32 +7,27 @@ import Button from 'components/Button';
 import Modal from 'components/Modal';
 import Searchbar from 'components/Searchbar';
 
-export class App extends Component {
-  state = {
-    query: '',
-    page: 1,
-    images: [],
-    largeImage: '',
-    loading: false,
-    error: null,
-  };
+export const App = () => {
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [largeImage, setLargeImage] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  async componentDidUpdate(prevProps, prevState) {
-    const { query, page } = this.state;
-    const prevQuery = prevState.query;
-    const prevPage = prevState.page;
+  const perPage = 12;
 
-    if (prevPage < page || prevQuery !== query) {
-      this.setState({ loading: true, error: null });
+  useEffect(() => {
+    if (!query) {
+      return;
+    }
+    setLoading(true);
 
+    const fetchData = async () => {
       try {
         const images = await api.fetchImages(query, page);
-
         if (images.hits.length) {
-          this.setState(prevState => ({
-            images: [...prevState.images, ...images.hits],
-            loading: false,
-          }));
+          setImages(prevState => [...prevState, ...images.hits]);
+          setLoading(true);
         } else {
           toast.error(
             `Sorry, there are no images matching your search query. Please try again.`,
@@ -49,59 +44,45 @@ export class App extends Component {
           );
         }
       } catch (error) {
-        this.setState({
-          loading: false,
-          error: error.message,
-        });
+      } finally {
+        setLoading(false);
       }
-    }
-  }
+    };
+    fetchData();
+  }, [query, page]);
 
-  handleSubmit = query => {
-    this.setState({
-      query,
-      page: 1,
-      images: [],
-    });
+  const handleSubmit = query => {
+    setQuery(query);
+    setImages([]);
+    setPage(1);
   };
 
-  onLoadMoreClick = () => {
-    this.setState(({ page }) => {
-      return {
-        page: page + 1,
-      };
-    });
+  const onLoadMoreClick = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  closeModal = () => {
-    this.setState({
-      largeImage: '',
-    });
+  const closeModal = () => {
+    setLargeImage('');
   };
 
-  openModal = largeImg => {
-    this.setState({
-      largeImage: largeImg,
-    });
+  const openModal = largeImage => {
+    setLargeImage(largeImage);
   };
 
-  render() {
-    const { images, loading, largeImage } = this.state;
-    return (
-      <div className="app">
-        <Searchbar onSubmit={this.handleSubmit} />
-        <ToastContainer />
-        {loading && <Loader />}
-        {images.length > 0 && (
-          <ImageGallery images={images} openModal={this.openModal} />
-        )}
-        {images.length > 0 && (
-          <Button onLoadMoreClick={this.onLoadMoreClick}></Button>
-        )}
-        {largeImage && (
-          <Modal largeImage={largeImage} onModalClick={this.closeModal} />
-        )}
-      </div>
-    );
-  }
-}
+  return (
+    <div className="app">
+      <Searchbar onSubmit={handleSubmit} />
+      <ToastContainer />
+      {loading && <Loader />}
+      {images.length > 0 && (
+        <ImageGallery images={images} openModal={openModal} />
+      )}
+      {images.length < perPage ? null : (
+        <Button onLoadMoreClick={onLoadMoreClick}></Button>
+      )}
+      {largeImage && (
+        <Modal largeImage={largeImage} onCloseModal={closeModal} />
+      )}
+    </div>
+  );
+};
